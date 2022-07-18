@@ -1,0 +1,17 @@
+.DS_Store
+chatClient/.DS_Store
+chatClient/META-INF/*
+chatClient/*.jar
+chatClient/*.class
+chatClient/*.dll
+chatClient/*.obj
+chatClient/*.so
+chatClient/*.dylib
+chatServer/.DS_Store
+chatServer/META-INF/*
+chatServer/*.jar
+chatServer/*.class
+chatServer/*.dll
+chatServer/*.obj
+chatServer/*.so
+chatServer/*.dylib
