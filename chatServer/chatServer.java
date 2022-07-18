@@ -322,6 +322,7 @@ class Server implements Runnable {
         void Sleep_(int us);
         void nonBlocking(int sock);
         boolean notRecv();
+        void reuse(int sock);
         int errorNum();
         int TCPSocket();
         int UDPSocket();
@@ -407,7 +408,11 @@ class Server implements Runnable {
         while (true) {
             select(sock, fds);
             if (soc.FD_ISSET_(sock, fds)) {
-                accept(sock);
+                try {
+                    accept(sock);
+                } catch (SocketException se) {
+                    System.out.println(se);
+                }
             }
             for (int i = 0; i < socklist.size(); i++) {
                 int recv = soc.recvS(socklist.get(i), buf, ARRAY_SIZE);
@@ -551,7 +556,7 @@ class Server implements Runnable {
         }
     }
     
-    private void accept(int sock) throws JsonProcessingException {
+    private void accept(int sock) throws JsonProcessingException, SocketException {
         MemberSTokenObj mstobj = new MemberSTokenObj();
         MemberObj memobj = new MemberObj();
         byte[] buf = new byte[ARRAY_SIZE];
@@ -567,8 +572,10 @@ class Server implements Runnable {
         ObjectMapper mapper = new ObjectMapper();
         mapper.configure(Feature.ESCAPE_NON_ASCII, true);
         String str;
+        int time = 0;
+        boolean flag = true;
         if (acceptSock < 0) {
-            System.out.println("Failed to accept.");
+            throw new SocketException("Failed to accept.");
         } else {
             soc.nonBlocking(acceptSock);
             while (true) {
@@ -585,11 +592,20 @@ class Server implements Runnable {
                         continue;
                     }
                     if (mes.type.equals("Send Name")) {
+                        flag = false;
                         break;
                     }
                 }
+                if (time * 10000 >= 1000000) {
+                    break;
+                }
                 soc.Sleep_(10000);
+                time++;
             }
+            if (flag) {
+                throw new SocketException("Failed to recieve: Name.");
+            }
+            flag = false;
             //System.out.println("Accept. (IP: " + acIPStr + ", port: " + acPortVal + ", Name: " + mes.message + ")");
             mstobj.name = mes.message;
             mstobj.stoken = mstobj.makeSToken(memberList);
@@ -597,9 +613,21 @@ class Server implements Runnable {
             mes.type = "Send StrToken";
             mes.token = (Object) 0;
             str = mapper.writeValueAsString(mes);
-            if (soc.sendS(acceptSock, str, ARRAY_SIZE) < 0) {
+            int n = 0;
+            while (soc.sendS(acceptSock, str, ARRAY_SIZE) < 0) {
+                if (n >= 10) {
+                    flag = true;
+                    break;
+                }
                 System.out.println("Failed to send.");
+                n++;
+                soc.Sleep_(10000);
             }
+            if (flag) {
+                throw new SocketException("Failed to send: StrToken.");
+            }
+            n = 0;
+            flag = false;
             soc.Sleep_(30000);
             mstobj.token = mstobj.makeToken(memberList);
             acList.add("token: " + mstobj.token + ", IP: " + acIPStr + ", port: " + acPortVal + ", Name: " + mstobj.name);
@@ -607,9 +635,20 @@ class Server implements Runnable {
             mes.type = "Send IntToken";
             mes.token = (Object) 0;
             str = mapper.writeValueAsString(mes);
-            if (soc.sendS(acceptSock, str, ARRAY_SIZE) < 0) {
+            while (soc.sendS(acceptSock, str, ARRAY_SIZE) < 0) {
+                if (n >= 10) {
+                    flag = true;
+                    break;
+                }
                 System.out.println("Failed to send.");
+                n++;
+                soc.Sleep_(10000);
             }
+            if (flag) {
+                throw new SocketException("Failed to send: IntToken.");
+            }
+            n = 0;
+            flag = false;
             memberList.add(mstobj);
             MemberObj memberobj = new MemberObj();
             memberobj.token = mstobj.token;
@@ -621,13 +660,21 @@ class Server implements Runnable {
             mes.token = (Object) 0;
             mes.message = strlist;
             str = mapper.writeValueAsString(mes);
-            if (soc.sendS(acceptSock, str, ARRAY_SIZE) < 0) {
+            while (soc.sendS(acceptSock, str, ARRAY_SIZE) < 0) {
+                if (n >= 10) {
+                    flag = true;
+                    break;
+                }
                 System.out.println("Failed to send.");
+                n++;
+                soc.Sleep_(10000);
             }
+            if (flag) {
+                throw new SocketException("Failed to send: List.");
+            }
+            n = 0;
+            flag = false;
             soc.Sleep_(30000);
-            if (soc.sendS(acceptSock, str, ARRAY_SIZE) < 0) {
-                System.out.println("Failed to send.");
-            }
             memobj.token = mstobj.token;
             memobj.name = mstobj.name;
             String strmem = mapper.writeValueAsString(memobj);
@@ -636,10 +683,22 @@ class Server implements Runnable {
             mes.message = strmem;
             str = mapper.writeValueAsString(mes);
             for (int i = 0; i < socklist.size(); i++) {
-                if (soc.sendS(socklist.get(i), str, ARRAY_SIZE) < 0) {
+                n = 0;
+                while (soc.sendS(socklist.get(i), str, ARRAY_SIZE) < 0) {
+                    if (n >= 10) {
+                        flag = true;
+                        break;
+                    }
                     System.out.println("Failed to send.");
+                    n++;
+                    soc.Sleep_(10000);
                 }
             }
+            if (flag) {
+                throw new SocketException("Failed to send: Add.");
+            }
+            n = 0;
+            flag = false;
             soc.Sleep_(10000);
             mes.type = "Past log";
             mes.token = (Object) 0;
@@ -648,17 +707,38 @@ class Server implements Runnable {
                     String strpast = mapper.writeValueAsString(pastLog.get(i));
                     mes.message = strpast;
                     str = mapper.writeValueAsString(mes);
-                    if (soc.sendS(acceptSock, str, ARRAY_SIZE) < 0) {
+                    n = 0;
+                    while (soc.sendS(acceptSock, str, ARRAY_SIZE) < 0) {
+                        if (n >= 10) {
+                            flag = true;
+                            break;
+                        }
                         System.out.println("Failed to send.");
+                        n++;
+                        soc.Sleep_(10000);
                     }
                 }
             } catch (Exception ex) {
                 
             }
+            if (flag) {
+                throw new SocketException("Failed to send: Past log.");
+            }
+            n = 0;
+            flag = false;
             mes.message = null;
             str = mapper.writeValueAsString(mes);
-            if (soc.sendS(acceptSock, str, ARRAY_SIZE) < 0) {
+            while (soc.sendS(acceptSock, str, ARRAY_SIZE) < 0) {
+                if (n >= 10) {
+                    flag = true;
+                    break;
+                }
                 System.out.println("Failed to send.");
+                n++;
+                soc.Sleep_(10000);
+            }
+            if (flag) {
+                throw new SocketException("Failed to send: Past log.");
             }
             socklist.add(acceptSock);
             PLMessageObj pastLogObj = new PLMessageObj();
@@ -669,27 +749,28 @@ class Server implements Runnable {
         }
     }
     
-    private void select(int sock, fd_set fds) throws Exception {
+    private void select(int sock, fd_set fds) throws SocketException {
         soc.FD_ZERO_(fds);
         soc.FD_SET_(sock, fds);
         if (soc.selectNT(sock, fds) < 0) {
             soc.closeSocket(sock);
-            throw new Exception("Failed to select.");
+            throw new SocketException("Failed to select.");
         }
     }
     
-    private int createSocket() throws Exception {
+    private int createSocket() throws SocketException {
         int sock = soc.TCPSocket();
         if (sock < 0) {
-            throw new Exception("Failed to create a socket.");
+            throw new SocketException("Failed to create a socket.");
         }
+        soc.reuse(sock);
         if (soc.bindNIP(sock, PORT) < 0) {
             soc.closeSocket(sock);
-            throw new Exception("Failed to bind.");
+            throw new SocketException("Failed to bind.");
         }
         if (soc.listenNB(sock) < 0) {
             soc.closeSocket(sock);
-            throw new Exception("Failed to listen.");
+            throw new SocketException("Failed to listen.");
         }
         if (com) {
             System.out.println("Server is up.");
@@ -836,5 +917,15 @@ class Buffer<T> {
 	
 	public int size() {
 		return length;
+	}
+}
+
+class SocketException extends Exception {
+	//warningを回避するための宣言
+	private static final long serialVersionUID = 1L; 
+
+	// コンストラクタ
+    SocketException (String msg) {
+		super(msg);
 	}
 }

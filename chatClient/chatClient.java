@@ -609,9 +609,23 @@ class ClientTransmission implements Runnable {
         mobj.token = (Object) (-1);
         mobj.type = "Send Name";
         String sendStr = mapper.writeValueAsString(mobj);
-         if (soc.sendS(sock, sendStr, ARRAY_SIZE) < 0) {
+        int n = 0;
+        boolean flag = false;
+        while (soc.sendS(sock, sendStr, ARRAY_SIZE) < 0) {
+            if (n >= 10) {
+                flag = true;
+                break;
+            }
             System.out.println("Failed to send.");
+            n++;
+            soc.Sleep_(10000);
         }
+        if (flag) {
+            throw new SocketException("Failed to send: Name.");
+        }
+        n = 0;
+        int time = 0;
+        flag = true;
         String recvStr;
         while (true) {
             int recv = soc.recvS(sock, buf, ARRAY_SIZE);
@@ -627,11 +641,21 @@ class ClientTransmission implements Runnable {
                     continue;
                 }
                 if (mobj.type.equals("Send StrToken")) {
+                    flag = false;
                     break;
                 }
             }
+            if (time * 10000 >= 1000000) {
+                break;
+            }
             soc.Sleep_(10000);
+            time++;
         }
+        if (flag) {
+            throw new SocketException("Failed to recieve: StrToken.");
+        }
+        time = 0;
+        flag = true;
         myobj.stoken = mobj.message;
         while (true) {
             int recv = soc.recvS(sock, buf, ARRAY_SIZE);
@@ -647,11 +671,21 @@ class ClientTransmission implements Runnable {
                     continue;
                 }
                 if (mobj.type.equals("Send IntToken")) {
+                    flag = false;
                     break;
                 }
             }
+            if (time * 10000 >= 1000000) {
+                break;
+            }
             soc.Sleep_(10000);
+            time++;
         }
+        if (flag) {
+            throw new SocketException("Failed to recieve: IntToken.");
+        }
+        time = 0;
+        flag = true;
         myobj.token = Integer.parseInt(mobj.message);
         share.myToken = Integer.parseInt(mobj.message);
         soc.getflag();
@@ -670,10 +704,18 @@ class ClientTransmission implements Runnable {
                     continue;
                 }
                 if (mobj.type.equals("Send List")) {
+                    flag = false;
                     break;
                 }
             }
+            if (time * 10000 >= 1000000) {
+                break;
+            }
             soc.Sleep_(10000);
+            time++;
+        }
+        if (flag) {
+            throw new SocketException("Failed to recieve: List.");
         }
         JsonNode node = mapper.readValue(mobj.message, JsonNode.class);
         MemberObj[] listValue = mapper.readValue(String.valueOf(node.get("list")), MemberObj[].class);
@@ -979,5 +1021,15 @@ class IPv4 {
 	public boolean is_ip(String str) {
 		String regex = "^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$";
 		return str.matches(regex);
+	}
+}
+
+class SocketException extends Exception {
+	//warningを回避するための宣言
+	private static final long serialVersionUID = 1L; 
+
+	// コンストラクタ
+    SocketException (String msg) {
+		super(msg);
 	}
 }

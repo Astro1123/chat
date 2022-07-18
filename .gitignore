@@ -7,6 +7,8 @@ chatClient/*.dll
 chatClient/*.obj
 chatClient/*.so
 chatClient/*.dylib
+chatClient/*.exp
+chatClient/*.lib
 chatServer/.DS_Store
 chatServer/META-INF/*
 chatServer/*.jar
@@ -15,3 +17,5 @@ chatServer/*.dll
 chatServer/*.obj
 chatServer/*.so
 chatServer/*.dylib
+chatServer/*.exp
+chatServer/*.lib
